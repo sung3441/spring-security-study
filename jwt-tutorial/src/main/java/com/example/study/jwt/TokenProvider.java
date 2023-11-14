@@ -5,8 +5,6 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,16 +28,21 @@ public class TokenProvider implements InitializingBean {
 
     private final String secret;
 
-    private final long tokenValidityInMilliseconds;
+    private final long accessTokenValidityInMilliseconds;
+
+    private final long refreshTokenValidityInMilliseconds;
 
     private Key key;
 
     public TokenProvider(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.token-validity-in-seconds}") long tokenValidityInMilliseconds) {
+            @Value("${jwt.access-token-validity-in-seconds}") long accessTokenValidityInMilliseconds,
+            @Value("${jwt.refresh-token-validity-in-seconds}") long refreshTokenValidityInMilliseconds
+    ) {
 
         this.secret = secret;
-        this.tokenValidityInMilliseconds = tokenValidityInMilliseconds * 1000;
+        this.accessTokenValidityInMilliseconds = accessTokenValidityInMilliseconds * 1000;
+        this.refreshTokenValidityInMilliseconds = refreshTokenValidityInMilliseconds * 1000;
     }
 
     @Override
@@ -48,20 +51,12 @@ public class TokenProvider implements InitializingBean {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String createToken(Authentication authentication) {
-        String authorities = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(","));
+    public String createRefreshToken(Authentication authentication) {
+        return createToken(authentication, this.refreshTokenValidityInMilliseconds);
+    }
 
-        long now = (new Date()).getTime();
-        Date validity = new Date(now + this.tokenValidityInMilliseconds);
-
-        return Jwts.builder()
-                .setSubject(authentication.getName())
-                .claim(AUTHORITIES_KEY, authorities)
-                .signWith(key, SignatureAlgorithm.HS512)
-                .setExpiration(validity)
-                .compact();
+    public String createAccessToken(Authentication authentication) {
+        return createToken(authentication, this.accessTokenValidityInMilliseconds);
     }
 
     public Authentication getAuthentication(String token) {
@@ -95,5 +90,21 @@ public class TokenProvider implements InitializingBean {
             log.info("JWT 토큰이 잘못되었습니다.");
         }
         return false;
+    }
+
+    private String createToken(Authentication authentication, long milliseconds) {
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
+
+        long now = (new Date()).getTime();
+        Date validity = new Date(now + milliseconds);
+
+        return Jwts.builder()
+                .setSubject(authentication.getName())
+                .claim(AUTHORITIES_KEY, authorities)
+                .signWith(key, SignatureAlgorithm.HS512)
+                .setExpiration(validity)
+                .compact();
     }
 }

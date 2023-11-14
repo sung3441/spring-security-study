@@ -31,6 +31,9 @@ public class User {
     @Column(name = "activated")
     private boolean activated;
 
+    @Column(name = "refresh_token")
+    private String refreshToken;
+
     @ManyToMany
     @JoinTable(
             name = "user_authority",

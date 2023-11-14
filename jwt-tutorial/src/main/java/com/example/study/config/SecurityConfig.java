@@ -73,6 +73,7 @@ public class SecurityConfig {
                 .antMatchers("/api/hello").permitAll() // /api/hello 에 대해서는 모든 권한 부여
                 .antMatchers("/api/authenticate").permitAll()
                 .antMatchers("/api/signup").permitAll()
+                .antMatchers("/api/refresh").permitAll()
                 .anyRequest().authenticated() // 나머지 요청에 대해서는 인증 필요
 
                 .and()

@@ -1,18 +1,19 @@
 package com.example.study.service;
 
+import com.example.study.dto.TokenDto;
 import com.example.study.dto.UserDto;
 import com.example.study.entity.Authority;
 import com.example.study.entity.User;
 import com.example.study.exception.NotFoundMemberException;
+import com.example.study.repository.AuthorityRepository;
 import com.example.study.repository.UserRepository;
 import com.example.study.util.SecurityUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collection;
+import javax.annotation.PostConstruct;
 import java.util.Collections;
-import java.util.Optional;
 
 @Service
 
@@ -20,10 +21,31 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthorityRepository authorityRepository;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, AuthorityRepository authorityRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.authorityRepository = authorityRepository;
+    }
+
+    @PostConstruct
+    public void init() {
+        Authority authority = Authority.builder()
+                .authorityName("ROLE_USER")
+                .build();
+
+        authorityRepository.save(authority);
+
+        User user = User.builder()
+                .username("user")
+                .password(passwordEncoder.encode("qwe123!@#"))
+                .nickname("nickname")
+                .authorities(Collections.singleton(authority))
+                .activated(true)
+                .build();
+
+        userRepository.save(user);
     }
 
     @Transactional
@@ -57,5 +79,13 @@ public class UserService {
         return UserDto.from(SecurityUtil.getCurrentUsername()
                 .flatMap(userRepository::findOneWithAuthoritiesByUsername)
                 .orElseThrow(() -> new NotFoundMemberException("Member not found")));
+    }
+
+    @Transactional
+    public void saveRefreshToken(String username, String refreshToken) {
+        User user = userRepository.findOneWithAuthoritiesByUsername(username)
+                .orElseThrow(NotFoundMemberException::new);
+
+        user.setRefreshToken(refreshToken);
     }
 }
